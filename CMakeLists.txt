@@ -17,7 +17,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-option(FS_ENABLE_STATIC_MSVC_RUNTIME "Build with static MSVC runtime (/MT)." ON)
+option(FS_ENABLE_STATIC_MSVC_RUNTIME "Build with static MSVC runtime (/MT)." OFF)
 option(FS_ENABLE_PDB_IN_RELEASE      "Emit PDB in Release builds (MSVC)."    ON)
 option(FS_ENABLE_ASAN                "Build with AddressSanitizer."           OFF)
 
