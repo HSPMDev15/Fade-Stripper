@@ -13,11 +13,11 @@
 // and check TARGET_OS_OSX for this tool (desktop only) __APPLE__ is fine
 
 #if defined(_WIN32)
-#  include <format>
-   namespace formatting = std;
+#include <format>
+namespace formatting = std;
 #elif defined(__linux__) || defined(__APPLE__)
-#  include <fmt/format.h>
-   namespace formatting = fmt;
+#include <fmt/format.h>
+namespace formatting = fmt;
 #else
-#  error "platform doesn`t support fmt"
+#error "platform doesn`t support fmt"
 #endif

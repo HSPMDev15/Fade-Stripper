@@ -13,8 +13,8 @@
 #pragma intrinsic(_rotr)
 // #endif
 
-#define rotlFixed(x, n) _rotl((x), (n))
-#define rotrFixed(x, n) _rotr((x), (n))
+#define rotlFixed(x, n) _rotl ((x), (n))
+#define rotrFixed(x, n) _rotr ((x), (n))
 
 #else
 
