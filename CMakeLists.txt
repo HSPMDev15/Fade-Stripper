@@ -39,17 +39,16 @@ if(UNIX)
 endif()
 
 add_library(lzma_sdk STATIC
-    src/lzma/LzmaDec.c
-    src/lzma/LzmaEnc.c
-    src/lzma/LzFind.c
+    third_party/lzma_sdk/LzmaDec.c
+    third_party/lzma_sdk/LzmaEnc.c
+    third_party/lzma_sdk/LzFind.c
+    third_party/lzma_sdk/Lzma86Dec.c
+    third_party/lzma_sdk/Lzma86Enc.c
 )
-target_include_directories(lzma_sdk PUBLIC src/lzma)
+target_include_directories(lzma_sdk PUBLIC third_party/lzma_sdk)
 target_compile_definitions(lzma_sdk PUBLIC _NO_EXCEPTIONS _LZMA_PROB32 _7ZIP_ST)
+target_compile_options(lzma_sdk PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/W0> $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-w>)
 
-target_compile_options(lzma_sdk PRIVATE
-    $<$<CXX_COMPILER_ID:MSVC>:/W0>
-    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-w>
-)
 
 add_executable(FadeStripper
     src/LZMA.cpp
@@ -58,8 +57,7 @@ add_executable(FadeStripper
     src/main.cpp
 )
 
-target_include_directories(FadeStripper PRIVATE src src/lzma)
-target_link_libraries(FadeStripper PRIVATE lzma_sdk)
+target_include_directories(FadeStripper PRIVATE src third_party/lzma_sdk)
 
 if(MSVC AND FS_ENABLE_STATIC_MSVC_RUNTIME)
     set_target_properties(FadeStripper PROPERTIES
@@ -73,6 +71,8 @@ endif()
 if(MSVC)
     target_link_libraries(FadeStripper PRIVATE dbghelp)
 endif()
+
+target_link_libraries(FadeStripper PRIVATE lzma_sdk)
 
 target_compile_options(FadeStripper PRIVATE
     $<$<CXX_COMPILER_ID:MSVC>:/W4 /permissive- /Zc:rvalueCast /EHa /MP /Oi /utf-8 /wd4127 /wd4201 /wd4324>
