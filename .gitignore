@@ -2,4 +2,4 @@ build/
 .vs/
 *.user
 *.bsp
-
+tests/
