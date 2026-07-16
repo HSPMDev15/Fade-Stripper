@@ -186,3 +186,74 @@ unsigned int LZMA_GetActualSize (const unsigned char* pInput, size_t inputSize) 
         return 0;
     return reinterpret_cast<const lzma_header_t*> (pInput)->actualSize;
 }
+
+bool LZMA_CompressZipEntry(const unsigned char* src, size_t srcLen, std::vector<unsigned char>& out) {
+
+    CLzmaEncHandle enc = LzmaEnc_Create(&g_Alloc);
+    if (!enc) return false;
+
+    CLzmaEncProps props;
+    LzmaEncProps_Init(&props);
+    if (LzmaEnc_SetProps(enc, &props) != SZ_OK) {
+        LzmaEnc_Destroy(enc, &g_Alloc, &g_Alloc);
+        return false;
+    }
+
+    Byte   propsBuf[LZMA_PROPS_SIZE];
+    size_t propsSize = LZMA_PROPS_SIZE;
+    if (LzmaEnc_WriteProperties(enc, propsBuf, &propsSize) != SZ_OK) {
+        LzmaEnc_Destroy(enc, &g_Alloc, &g_Alloc);
+        return false;
+    }
+
+    const unsigned int capacity = static_cast<unsigned int>(srcLen) / 20 * 21 + (1 << 16);
+    std::vector<Byte> compBuf(capacity);
+
+    COutStreamRam outStream;
+    OutStreamInit(&outStream, compBuf.data(), compBuf.size());
+    CInStreamRam inStream;
+    InStreamInit(&inStream, reinterpret_cast<const Byte*>(src), srcLen);
+
+    const SRes res = LzmaEnc_Encode(enc, &outStream.vt, &inStream.vt, nullptr, &g_Alloc, &g_Alloc);
+    LzmaEnc_Destroy(enc, &g_Alloc, &g_Alloc);
+    if (res != SZ_OK || outStream.overflow) return false;
+
+    // Layout ZIP method 14 
+    out.clear();
+    out.reserve(4 + propsSize + outStream.pos);
+    out.push_back(9); out.push_back(20); 
+    out.push_back(static_cast<unsigned char>(propsSize & 0xFF));
+    out.push_back(static_cast<unsigned char>((propsSize >> 8) & 0xFF));
+    out.insert(out.end(), propsBuf, propsBuf + propsSize);
+    out.insert(out.end(), compBuf.data(), compBuf.data() + outStream.pos);
+    return true;
+}
+
+bool LZMA_DecompressZipEntry(const unsigned char* src, size_t srcLen,
+                             size_t uncompressedSize, std::vector<unsigned char>& out) {
+    if (srcLen < 4) return false;
+    const uint16_t propsSize = static_cast<uint16_t>(src[2]) |
+                               (static_cast<uint16_t>(src[3]) << 8);
+    if (propsSize != LZMA_PROPS_SIZE || srcLen < 4u + propsSize) return false;
+
+    const Byte* props  = src + 4;
+    const Byte* stream = src + 4 + propsSize;
+    SizeT inLen  = srcLen - 4 - propsSize;
+    SizeT outLen = uncompressedSize;
+
+    out.resize(uncompressedSize);
+    CLzmaDec state;
+    LzmaDec_Construct(&state);
+    if (LzmaDec_Allocate(&state, props, propsSize, &g_Alloc) != SZ_OK) return false;
+    LzmaDec_Init(&state);
+
+    ELzmaStatus status;
+    const SRes res = LzmaDecode(reinterpret_cast<Byte*>(out.data()), &outLen,
+                         stream, &inLen, props, propsSize,LZMA_FINISH_ANY, &status, &g_Alloc);
+
+    LzmaDec_Free(&state, &g_Alloc);
+
+    if (res != SZ_OK) return false;
+    out.resize(outLen);
+    return true;
+}

@@ -4,6 +4,7 @@
 #include "BSPTypes.h"
 #include "LzmaDec.h"
 #include "LzmaEnc.h"
+#include <vector>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -24,3 +25,11 @@ bool LZMA_IsCompressed (const unsigned char* pInput, size_t inputSize);
 
 // Returns the uncompressed size from the Valve LZMA header (0 if not LZMA).
 unsigned int LZMA_GetActualSize (const unsigned char* pInput, size_t inputSize);
+
+// ZIP entry LZMA (aka method 14) format from https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT
+// this is different from Valve lzma_header_t (used for the game lump)
+// i still use same lzma_sdk but with a different header layout
+bool LZMA_CompressZipEntry(const unsigned char* src, size_t srcLen, std::vector<unsigned char>& out);
+
+bool LZMA_DecompressZipEntry(const unsigned char* src, size_t srcLen,
+                             size_t uncompressedSize,  std::vector<unsigned char>& out);

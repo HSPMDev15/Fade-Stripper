@@ -74,6 +74,8 @@ static fs::path buildOutputPath(const fs::path& input, const std::optional<fs::p
 
 int main(int argc, char* argv[])  {
     
+    std::printf("FadeStripper (%s)\n", __DATE__);
+
     const auto args_t = parseargs(argc, argv);
     if (!args_t) {
         printUsage();
@@ -118,6 +120,13 @@ int main(int argc, char* argv[])  {
 
     std::fputs("Deleting fade on static props...\n", stdout);
 
+    const std::string  oldStem = args_t->input.stem().string();
+    const RenameResult ren     = bsp.renameMapReferences(oldStem);
+    if (!ren.ok) {
+        std::fprintf(stderr, "Error: failed to rename map references!!!\n");
+        return 1;
+    }
+
     const auto t0 = chr::high_resolution_clock::now();
 
     if (!bsp.bake(outputPath.string())){
@@ -126,6 +135,6 @@ int main(int argc, char* argv[])  {
     }
 
     const double elapsed = chr::duration<double>(chr::high_resolution_clock::now() - t0).count();
-    std::fprintf(stdout, "\nDone in %.3fs -> %s\n", elapsed, outputPath.filename().string().c_str());
+    std::fprintf(stdout, "\nCompleted in %.3fs -> %s\n", elapsed, outputPath.filename().string().c_str());
     return 0;
 }

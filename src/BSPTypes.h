@@ -1,17 +1,14 @@
 #pragma once
 #include <cstddef>
 #include <cstdint>
-#include <optional>
-#include <string>
-#include <string_view>
-#include <vector>
 
-inline constexpr uint32_t IDBSPHEADER = 0x50534256u; // "VBSP" LE
+// #define IDBSPHEADER	(('P'<<24)+('S'<<16)+('B'<<8)+'V') litte endian
+inline constexpr uint32_t IDBSPHEADER = 0x50534256u; 
 inline constexpr int HEADER_LUMPS     = 64;
 inline constexpr int MINBSPVERSION    = 19;
 inline constexpr int BSPVERSION       = 21;
 
-// LZMA_ID = (('A'<<24)|('M'<<16)|('Z'<<8)|'L') ts aint x360
+// LZMA_ID = (('A'<<24)|('M'<<16)|('Z'<<8)|'L') 
 inline constexpr uint32_t LZMA_ID    = 0x414D5A4Cu;
 inline constexpr int LZMA_PROPS_SIZE = 5;
 
@@ -26,10 +23,12 @@ static_assert (sizeof (lzma_header_t) == 17);
 #pragma pack(pop)
 
 enum BSPLumpIndex : int {
-    LUMP_ENTITIES  = 0,
-    LUMP_GAME_LUMP = 35,
-    LUMP_PAKFILE   = 40,
-    LUMP_MAP_FLAGS = 59,
+    LUMP_ENTITIES             = 0,
+    LUMP_GAME_LUMP            = 35,
+    LUMP_PAKFILE              = 40,
+    LUMP_TEXDATA_STRING_DATA  = 43,
+    LUMP_TEXDATA_STRING_TABLE = 44,
+    LUMP_MAP_FLAGS            = 59,
 };
 
 #pragma pack(push, 1)
