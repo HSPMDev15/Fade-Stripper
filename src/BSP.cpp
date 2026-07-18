@@ -333,8 +333,7 @@ RenameResult BSP::patchPakfile(std::string_view oldStem, std::string_view newSte
             result.ok = false; return result;
         }
         ZipCentralHeader ch; memcpy(&ch, zip + cd, sizeof(ch));
-        if (ch.signature != ZIP_SIG_CENTRAL ||
-            (ch.compressionMethod != 0 && ch.compressionMethod != 14)) {
+        if (ch.signature != ZIP_SIG_CENTRAL || (ch.compressionMethod != 0 && ch.compressionMethod != 14)) {
             std::fprintf(stderr, "Unsupported entry method=%u\n", ch.compressionMethod);
             result.ok = false; return result;
         }
@@ -359,8 +358,7 @@ RenameResult BSP::patchPakfile(std::string_view oldStem, std::string_view newSte
             std::fprintf(stderr, "Bad local header signature for '%s'\n", e.name.c_str());
             result.ok = false; return result;
         }
-        const size_t dataPos = static_cast<size_t>(ch.localHeaderOffset) +
-                               sizeof(ZipLocalHeader) + lh.fileNameLength + lh.extraFieldLength;
+        const size_t dataPos = static_cast<size_t>(ch.localHeaderOffset) + sizeof(ZipLocalHeader) + lh.fileNameLength + lh.extraFieldLength;
         if (dataPos + ch.compressedSize > zipLen) {
             std::fprintf(stderr, "Entry data out of range for '%s'\n", e.name.c_str());
             result.ok = false; return result;
@@ -416,7 +414,7 @@ RenameResult BSP::patchPakfile(std::string_view oldStem, std::string_view newSte
     result.pakEntries = static_cast<int>(entries.size());
     const bool useLzma = result.pakIsLzma;
 
-    std::printf("Map is %s compressed\n", useLzma ? "" : "NOT");
+    std::printf("Map is%s compressed\n", useLzma ? "" : " NOT");
     std::printf("Found %d files in pak file\n", result.pakEntries);
     std::printf("Writing files...\n");
 
@@ -546,8 +544,7 @@ void BSP::patchTexdata(std::string_view oldStem, std::string_view newStem) {
             }
             return {};
         }
-        return std::vector<uint8_t>(rawFile_.data() + l.fileofs,
-                                    rawFile_.data() + l.fileofs + l.filelen);
+        return std::vector<uint8_t>(rawFile_.data() + l.fileofs, rawFile_.data() + l.fileofs + l.filelen);
     };
 
     auto storeLump = [&](int idx, const uint8_t* src, int srcSz, bool compress) {

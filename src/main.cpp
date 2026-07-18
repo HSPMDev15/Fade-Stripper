@@ -34,7 +34,7 @@ static std::optional<args_t> parseargs(int argc, char* argv[])
     for (int i = 1; i < argc; ++i)
     {
         const std::string_view arg = argv[i];
-        if (arg == "-output" || arg == "--output")
+        if (arg == "-output" || arg == "--output") //handle both forms
         {
             if (i + 1 >= argc)
             {
@@ -118,6 +118,8 @@ int main(int argc, char* argv[])  {
         return 0;
     }
 
+    const auto t0 = chr::high_resolution_clock::now();
+
     std::fputs("Deleting fade on static props...\n", stdout);
 
     const std::string  oldStem = args_t->input.stem().string();
@@ -127,14 +129,12 @@ int main(int argc, char* argv[])  {
         return 1;
     }
 
-    const auto t0 = chr::high_resolution_clock::now();
-
     if (!bsp.bake(outputPath.string())){
         std::fprintf(stderr, "Error: could not write %s\n", outputPath.string().c_str());
         return 1;
     }
 
     const double elapsed = chr::duration<double>(chr::high_resolution_clock::now() - t0).count();
-    std::fprintf(stdout, "\nCompleted in %.3fs -> %s\n", elapsed, outputPath.filename().string().c_str());
+    std::fprintf(stdout, "Completed in %.3fs -> %s\n", elapsed, outputPath.string().c_str());  
     return 0;
 }
