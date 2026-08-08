@@ -220,7 +220,7 @@ void BSP::recompressGameLumps() {
         }
 
         if (static_cast<int>(compSz) > slotSize) {
-            Warning("Recompressed sprp ({} bytes) exceeds slot ({} bytes)\n Props will not be patched!!!", compSz, slotSize);
+            Warning("Recompressed sprp ({} bytes) exceeds slot ({} bytes)\n Static Props will not be patched!!!", compSz, slotSize);
             free(comp);
             continue;
         }
@@ -254,11 +254,10 @@ RenameResult BSP::patchPakfile(std::string_view oldStem, std::string_view newSte
         if (eocdPos == 0) break;
         --eocdPos;
     }
-    if (!found) {
+    /*if (!found) {
         Error("Pakfile EOCD not found");
         result.ok = false; return result;
-    }
-
+    }*/
     ZipEOCD eocd; memcpy(&eocd, zip + eocdPos, sizeof(eocd));
 
     result.pakEntries = static_cast<int>(eocd.centralDirEntriesTotal);
@@ -271,7 +270,7 @@ RenameResult BSP::patchPakfile(std::string_view oldStem, std::string_view newSte
     }
     Info("Found {} files in pakfile", result.pakEntries);
     Info("Map is{} compressed", result.pakIsLzma ? "" : " NOT");
-    
+    sleep(1); //let user just for one second to see the program logs before the terminal fills with the renamed references logs
     struct Rule { std::string from, to, vmtFind, vmtReplace; bool isMaterial; };
     const std::array<Rule, 4> rules{{
         { "materials/maps/" + std::string{oldStem} + "/",
@@ -303,10 +302,10 @@ RenameResult BSP::patchPakfile(std::string_view oldStem, std::string_view newSte
 
     size_t cd = eocd.centralDirOffset;
     for (uint16_t i = 0; i < eocd.centralDirEntriesTotal; ++i) {
-        if (cd + sizeof(ZipCentralHeader) > zipLen) {
+        /*if (cd + sizeof(ZipCentralHeader) > zipLen) {
             Error("Central directory truncated at entry {}", i);
             result.ok = false; return result;
-        }
+        }*/
         ZipCentralHeader ch; memcpy(&ch, zip + cd, sizeof(ch));
         if (ch.signature != ZIP_SIG_CENTRAL || (ch.compressionMethod != 0 && ch.compressionMethod != 14)) {
             Error("Unsupported entry method={}", ch.compressionMethod); //99.99% impossible since engine wouldnt even load the map but lets keep it...
@@ -324,20 +323,20 @@ RenameResult BSP::patchPakfile(std::string_view oldStem, std::string_view newSte
         e.compSize   = ch.compressedSize;
         e.uncompSize = ch.uncompressedSize;
 
-        if (static_cast<size_t>(ch.localHeaderOffset) + sizeof(ZipLocalHeader) > zipLen) {
+        /*if (static_cast<size_t>(ch.localHeaderOffset) + sizeof(ZipLocalHeader) > zipLen) {
             Error("Local header out of range for '{}'", e.name);
             result.ok = false; return result;
-        }
+        }*/
         ZipLocalHeader lh; memcpy(&lh, zip + ch.localHeaderOffset, sizeof(lh));
-        if (lh.signature != ZIP_SIG_LOCAL) {
+        /*if (lh.signature != ZIP_SIG_LOCAL) {
             Error("Bad local header signature for '{}'", e.name);
             result.ok = false; return result;
-        }
+        }*/
         const size_t dataPos = static_cast<size_t>(ch.localHeaderOffset) + sizeof(ZipLocalHeader) + lh.fileNameLength + lh.extraFieldLength;
-        if (dataPos + ch.compressedSize > zipLen) {
+        /*if (dataPos + ch.compressedSize > zipLen) {
             Error("Entry data out of range for '{}'", e.name);
             result.ok = false; return result;
-        }
+        }*/
         e.origComp = zip + dataPos;
 
         for (char& c : e.name) if (c == '\\') c = '/';
