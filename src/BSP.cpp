@@ -2,10 +2,7 @@
 #include "LZMA.h"
 #include "log.h"
 #include <algorithm>
-#include <filesystem>
 #include <fstream>
-
-namespace fs = std::filesystem;
 
 static std::vector<uint8_t> readFile (const std::string& path) {
     std::ifstream f (path, std::ios::binary | std::ios::ate);
@@ -131,46 +128,14 @@ void BSP::parseGameLumps () {
         gameLumps_.push_back (std::move (gl2));
     }
 }
+// Writes the full BSP to the disk.
+// renameMapReferences() always leaves rawFile_ and header_ consistent
+// with each other before this runs, so a single rewrite path covers
+// every case (fade-only patch or full rename).
+bool BSP::bake(std::string_view outputPath) const {
+    if (!loaded_) return false;
+    const std::string dest = outputPath.empty() ? path_ : std::string{outputPath};
 
-bool BSP::bake (std::string_view outputPath) const {
-    if (!loaded_)
-        return false;
-    const std::string dest = outputPath.empty () ? path_ : std::string{ outputPath };
-
-    const bool anyCompressed = std::ranges::any_of (gameLumps_,
-    [] (const GameLump& gl) { return (gl.flags & GAMELUMPFLAG_COMPRESSED) != 0; });
-
-    return (anyCompressed || requiresFullRewrite_) ? bakeFullRewrite(dest) : bakeFast(dest);
-}
-
-bool BSP::bakeFast (const std::string& dest) const {
-    std::error_code ec;
-    fs::copy_file (fs::path{ path_ }, fs::path{ dest },
-    fs::copy_options::overwrite_existing, ec);
-    if (ec)
-        return false;
-
-    std::fstream f (dest, std::ios::binary | std::ios::in | std::ios::out);
-    if (!f)
-        return false;
-
-    for (const GameLump& gl : gameLumps_) {
-        if (gl.fileofs <= 0 || gl.data.empty ())
-            continue;
-        f.seekp (static_cast<std::streamoff> (gl.fileofs));
-        f.write (reinterpret_cast<const char*> (gl.data.data ()),
-        static_cast<std::streamsize> (gl.data.size ()));
-        if (!f)
-            return false;
-    }
-
-    return true;
-}
-
-// Rewrites the full BSP
-// renameMapReferences() already leaves rawFile_ and header_ consistent
-// with each other before this runs
-bool BSP::bakeFullRewrite(const std::string& dest) const {
     Info("Writing BSP {}...", dest);
 
     std::ofstream f(dest, std::ios::binary | std::ios::trunc);
@@ -197,7 +162,7 @@ bool BSP::bakeFullRewrite(const std::string& dest) const {
     }
 
     const bool ok = f.good();
-    if (ok) Info("Done!     ");
+    if (ok) Info("Done!");
     return ok;
 }
 
@@ -656,7 +621,6 @@ RenameResult BSP::renameMapReferences(std::string_view oldStem) {
     const RenameResult result = patchPakfile(oldStem, newStem);
     if (!result.ok) return result;
 
-    requiresFullRewrite_ = true;
     patchTexdata(oldStem, newStem);
     return result;
 }

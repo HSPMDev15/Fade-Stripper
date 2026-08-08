@@ -46,9 +46,6 @@ private:
     bool load(std::string_view path);
     void parseGameLumps();
 
-    bool bakeFast(const std::string& dest) const;
-    bool bakeFullRewrite(const std::string& dest) const;
-
     void burnPatchedGameLumps();
     void recompressGameLumps();
     RenameResult patchPakfile(std::string_view oldStem, std::string_view newStem);
@@ -61,7 +58,6 @@ private:
     std::vector<GameLump> gameLumps_;
 
     std::unordered_map<int, std::vector<uint8_t>> pendingLumps_;
-    bool requiresFullRewrite_ = false;
 };
 
 // ZIP Pakfile (same format from zip_uncompressed.h)
