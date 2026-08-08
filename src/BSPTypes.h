@@ -8,20 +8,6 @@ inline constexpr int HEADER_LUMPS     = 64;
 inline constexpr int MINBSPVERSION    = 19;
 inline constexpr int BSPVERSION       = 21;
 
-// LZMA_ID = (('A'<<24)|('M'<<16)|('Z'<<8)|'L') 
-inline constexpr uint32_t LZMA_ID    = 0x414D5A4Cu;
-inline constexpr int LZMA_PROPS_SIZE = 5;
-
-#pragma pack(push, 1)
-struct lzma_header_t {
-    uint32_t id;
-    uint32_t actualSize; // always little-endian
-    uint32_t lzmaSize;   // compressed payload size
-    unsigned char properties[LZMA_PROPS_SIZE];
-};
-static_assert (sizeof (lzma_header_t) == 17);
-#pragma pack(pop)
-
 enum BSPLumpIndex : int {
     LUMP_ENTITIES             = 0,
     LUMP_GAME_LUMP            = 35,
