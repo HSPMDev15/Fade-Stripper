@@ -8,7 +8,6 @@
 #include <vector>
 #include <array>
 #include <cctype>
-#include <cstdio>
 #include <optional>
 
 struct GameLump {

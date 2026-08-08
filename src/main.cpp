@@ -1,8 +1,7 @@
 #include "BSP.h"
-#include "Formatting.h"
+#include "log.h"
 #include "StaticProps.h"
 #include <chrono>
-#include <cstdio>
 #include <filesystem>
 
 namespace fs  = std::filesystem;
@@ -38,20 +37,20 @@ static std::optional<args_t> parseargs(int argc, char* argv[])
         {
             if (i + 1 >= argc)
             {
-                std::fprintf(stderr, "Error: output requires a path argument\n");
+                Error("output requires a path argument");
                 return std::nullopt;
             }
             args_t.outputDir = fs::path{argv[++i]};
         }
         else if (!arg.empty() && arg[0] == '-')
         {
-            std::fprintf(stderr, "Error: unknown argument '%s'\n", argv[i]);
+            Error("unknown argument '{}'", argv[i]);
             return std::nullopt;
         }
         else
         {
             if (!args_t.input.empty()) {
-                std::fprintf(stderr, "Error: multiple input files specified\n");
+                Error("multiple input files specified"); //TODO: allow multiple BSP to be patched???
                 return std::nullopt;
             }
             args_t.input = fs::path{argv[i]};
@@ -59,7 +58,7 @@ static std::optional<args_t> parseargs(int argc, char* argv[])
     }
 
     if (args_t.input.empty()) {
-        std::fprintf(stderr, "Error: no input file specified\n");
+        Error("no input file specified");
         return std::nullopt;
     }
 
@@ -74,7 +73,7 @@ static fs::path buildOutputPath(const fs::path& input, const std::optional<fs::p
 
 int main(int argc, char* argv[])  {
     
-    std::printf("FadeStripper (%s)\n", __DATE__);
+    Info("FadeStripper ({})", __DATE__);
 
     const auto args_t = parseargs(argc, argv);
     if (!args_t) {
@@ -88,53 +87,49 @@ int main(int argc, char* argv[])  {
         std::error_code ec;
         fs::create_directories(*args_t->outputDir, ec);
         if (ec){
-            std::fprintf(stderr, "Error: cannot create output directory '%s': %s\n",
-                         args_t->outputDir->string().c_str(), ec.message().c_str());
+            Error("cannot create output directory '{}': {}", args_t->outputDir->string(), ec.message());
             return 1;
         }
     }
 
     BSP bsp{args_t->input.string()};
     if (!bsp){
-        std::fprintf(stderr, "Error: could not load '%s' (invalid or unsupported BSP)\n",
-                     args_t->input.string().c_str());
+        Error("could not load '{}' (invalid or unsupported BSP)", args_t->input.string());
         return 1;
     }
-    std::fprintf(stdout, "%s loaded (BSP v%d)\n",
-                 args_t->input.filename().string().c_str(), bsp.version());
 
-    const LogFn log = [](const char*) {};
-    const PatchResult res = patchStaticPropFades(bsp, log);
+    Info("{} loaded (BSP v{})",  args_t->input.filename().string(), bsp.version());
 
+    const PatchResult res = patchStaticPropFades(bsp);
+ 
     if (!res.ok)  {
-        std::fprintf(stderr, "Error: %s\n", res.error.c_str());
         return 1;
     }
-
-    std::fprintf(stdout, "Found %d static props, %d are with fade\n", res.total, res.hasFade);
+ 
+    Info("Found {} static props, {} are with fade", res.total, res.hasFade);
 
     if (res.patched == 0) {
-        std::fputs("All static props are already without fade\nCancelling...\n", stdout);
+        Warning("All static props are already without fade\nCancelling...");
         return 0;
     }
-
+ 
     const auto t0 = chr::high_resolution_clock::now();
-
-    std::fputs("Deleting fade on static props...\n", stdout);
+ 
+    Info("Deleting fade on static props...");
 
     const std::string  oldStem = args_t->input.stem().string();
     const RenameResult ren     = bsp.renameMapReferences(oldStem);
     if (!ren.ok) {
-        std::fprintf(stderr, "Error: failed to rename map references!!!\n");
+        Error("failed to rename map references!!!");
         return 1;
     }
 
     if (!bsp.bake(outputPath.string())){
-        std::fprintf(stderr, "Error: could not write %s\n", outputPath.string().c_str());
+        Error("could not write {}", outputPath.string());
         return 1;
     }
-
+ 
     const double elapsed = chr::duration<double>(chr::high_resolution_clock::now() - t0).count();
-    std::fprintf(stdout, "Completed in %.3fs -> %s\n", elapsed, outputPath.string().c_str());  
+    Info("Completed in {:.3f}s -> {}", elapsed, outputPath.string());  
     return 0;
 }

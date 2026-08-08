@@ -1,7 +1,11 @@
 #pragma once
 
-// Prupose: console output with semantic levels (did it mainly to avoid greedy .c_str() and print directly the literal strings)
-// Error/Warning go to stderr with color,info goes to stdout (the normal output of the program)
+//-----------------------------------------------------------------------------
+// Prupose:
+// Console log output with semantic levels
+// Error/Warning go to stderr with the respective color
+// Info use stdout (the normal output of the program)
+//-----------------------------------------------------------------------------
 
 #include "Formatting.h"
 #include <cstdio>

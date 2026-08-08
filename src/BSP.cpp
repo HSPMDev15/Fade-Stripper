@@ -1,5 +1,6 @@
 #include "BSP.h"
 #include "LZMA.h"
+#include "log.h"
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
@@ -170,7 +171,7 @@ bool BSP::bakeFast (const std::string& dest) const {
 // renameMapReferences() already leaves rawFile_ and header_ consistent
 // with each other before this runs
 bool BSP::bakeFullRewrite(const std::string& dest) const {
-    std::printf("Writing BSP %s...\n", dest.c_str());
+    Info("Writing BSP {}...", dest);
 
     std::ofstream f(dest, std::ios::binary | std::ios::trunc);
     if (!f) return false;
@@ -196,7 +197,7 @@ bool BSP::bakeFullRewrite(const std::string& dest) const {
     }
 
     const bool ok = f.good();
-    if (ok) std::printf("Done!     \n");
+    if (ok) Info("Done!     ");
     return ok;
 }
 
@@ -249,14 +250,12 @@ void BSP::recompressGameLumps() {
         unsigned char* comp = LZMA_Compress(
             gl.data.data(), static_cast<unsigned int>(gl.data.size()), &compSz);
         if (!comp) {
-            std::fprintf(stderr, "Error: LZMA recompression failed for game lump 0x%08X\n", gl.id);
+            Error("LZMA recompression failed for game lump 0x{:08X}", gl.id);
             continue;
         }
 
         if (static_cast<int>(compSz) > slotSize) {
-            std::fprintf(stderr,
-                "WARNING: Recompressed sprp (%u bytes) exceeds slot (%d bytes), "
-                "fades will not be patched!!!\n", compSz, slotSize);
+            Warning("Recompressed sprp ({} bytes) exceeds slot ({} bytes)\n Props will not be patched!!!", compSz, slotSize);
             free(comp);
             continue;
         }
@@ -291,12 +290,23 @@ RenameResult BSP::patchPakfile(std::string_view oldStem, std::string_view newSte
         --eocdPos;
     }
     if (!found) {
-        std::fprintf(stderr, "Pakfile EOCD not found\n");
+        Error("Pakfile EOCD not found");
         result.ok = false; return result;
     }
 
     ZipEOCD eocd; memcpy(&eocd, zip + eocdPos, sizeof(eocd));
 
+    result.pakEntries = static_cast<int>(eocd.centralDirEntriesTotal);
+    if (eocd.centralDirEntriesTotal > 0 && eocd.centralDirOffset + sizeof(ZipCentralHeader) <= zipLen) {
+        ZipCentralHeader firstCh;
+        memcpy(&firstCh, zip + eocd.centralDirOffset, sizeof(firstCh));
+        if (firstCh.signature == ZIP_SIG_CENTRAL) {
+            result.pakIsLzma = (firstCh.compressionMethod == 14);
+        }
+    }
+    Info("Found {} files in pakfile", result.pakEntries);
+    Info("Map is{} compressed", result.pakIsLzma ? "" : " NOT");
+    
     struct Rule { std::string from, to, vmtFind, vmtReplace; bool isMaterial; };
     const std::array<Rule, 4> rules{{
         { "materials/maps/" + std::string{oldStem} + "/",
@@ -329,12 +339,12 @@ RenameResult BSP::patchPakfile(std::string_view oldStem, std::string_view newSte
     size_t cd = eocd.centralDirOffset;
     for (uint16_t i = 0; i < eocd.centralDirEntriesTotal; ++i) {
         if (cd + sizeof(ZipCentralHeader) > zipLen) {
-            std::fprintf(stderr, "Central directory truncated at entry %u\n", i);
+            Error("Central directory truncated at entry {}", i);
             result.ok = false; return result;
         }
         ZipCentralHeader ch; memcpy(&ch, zip + cd, sizeof(ch));
         if (ch.signature != ZIP_SIG_CENTRAL || (ch.compressionMethod != 0 && ch.compressionMethod != 14)) {
-            std::fprintf(stderr, "Unsupported entry method=%u\n", ch.compressionMethod);
+            Error("Unsupported entry method={}", ch.compressionMethod); //99.99% impossible since engine wouldnt even load the map but lets keep it...
             result.ok = false; return result;
         }
         if (!globalMethod) globalMethod = ch.compressionMethod;
@@ -350,17 +360,17 @@ RenameResult BSP::patchPakfile(std::string_view oldStem, std::string_view newSte
         e.uncompSize = ch.uncompressedSize;
 
         if (static_cast<size_t>(ch.localHeaderOffset) + sizeof(ZipLocalHeader) > zipLen) {
-            std::fprintf(stderr, "Local header out of range for '%s'\n", e.name.c_str());
+            Error("Local header out of range for '{}'", e.name);
             result.ok = false; return result;
         }
         ZipLocalHeader lh; memcpy(&lh, zip + ch.localHeaderOffset, sizeof(lh));
         if (lh.signature != ZIP_SIG_LOCAL) {
-            std::fprintf(stderr, "Bad local header signature for '%s'\n", e.name.c_str());
+            Error("Bad local header signature for '{}'", e.name);
             result.ok = false; return result;
         }
         const size_t dataPos = static_cast<size_t>(ch.localHeaderOffset) + sizeof(ZipLocalHeader) + lh.fileNameLength + lh.extraFieldLength;
         if (dataPos + ch.compressedSize > zipLen) {
-            std::fprintf(stderr, "Entry data out of range for '%s'\n", e.name.c_str());
+            Error("Entry data out of range for '{}'", e.name);
             result.ok = false; return result;
         }
         e.origComp = zip + dataPos;
@@ -373,18 +383,17 @@ RenameResult BSP::patchPakfile(std::string_view oldStem, std::string_view newSte
 
             const std::string oldName = e.name;
             e.name = rule.to + e.name.substr(rule.from.size());
-            std::printf("Renaming file:\n\t%s\n\t%s\n", oldName.c_str(), e.name.c_str());
+            Info("Renaming file:\n\t{}\n\t{}", oldName, e.name);
             ++result.pakRenamed;
 
             // Entries under "materials/" also get their VMT content rewritten
             if (rule.isMaterial && e.name.ends_with(".vmt")) {
-                std::printf("Fixing VMT:\n\t%s\n", e.name.c_str());
+                Info("Fixing VMT:\n\t{}", e.name);
 
                 std::vector<uint8_t> raw;
                 if (ch.compressionMethod == 14) {
-                    if (!LZMA_DecompressZipEntry(e.origComp, ch.compressedSize,
-                                                  ch.uncompressedSize, raw)) {
-                        std::fprintf(stderr, "LZMA decompress failed for '%s'\n", e.name.c_str());
+                    if (!LZMA_DecompressZipEntry(e.origComp, ch.compressedSize,ch.uncompressedSize, raw)) {
+                        Error("LZMA decompress failed for '{}'", e.name);
                         result.ok = false; return result;
                     }
                 } else {
@@ -399,7 +408,7 @@ RenameResult BSP::patchPakfile(std::string_view oldStem, std::string_view newSte
                     p += rule.vmtReplace.size();
                     ++replacements;
                 }
-                std::printf("\t-> Made %d replacements\n", replacements);
+                Info("\t-> Made {} replacements", replacements);
 
                 e.newData.assign(s.begin(), s.end());
                 e.contentModified = true;
@@ -414,9 +423,7 @@ RenameResult BSP::patchPakfile(std::string_view oldStem, std::string_view newSte
     result.pakEntries = static_cast<int>(entries.size());
     const bool useLzma = result.pakIsLzma;
 
-    std::printf("Map is%s compressed\n", useLzma ? "" : " NOT");
-    std::printf("Found %d files in pak file\n", result.pakEntries);
-    std::printf("Writing files...\n");
+    Info("Writing files...");
 
     struct Packed { uint32_t offset, crc, compSize, uncompSize; uint16_t method;
                     std::vector<uint8_t> payload; };
@@ -437,7 +444,7 @@ RenameResult BSP::patchPakfile(std::string_view oldStem, std::string_view newSte
             p.uncompSize = static_cast<uint32_t>(e.newData.size());
             if (useLzma) {
                 if (!LZMA_CompressZipEntry(e.newData.data(), e.newData.size(), p.payload)) {
-                    std::fprintf(stderr, "LZMA compress failed for '%s'\n", e.name.c_str());
+                    Error("LZMA compress failed for '{}'", e.name);
                     result.ok = false; return result;
                 }
                 p.compSize = static_cast<uint32_t>(p.payload.size());
@@ -471,12 +478,11 @@ RenameResult BSP::patchPakfile(std::string_view oldStem, std::string_view newSte
             out.insert(out.end(), e.origComp, e.origComp + e.compSize);
         }
 
-        std::printf("Progress: %zu/%zu (%2.0f%%)           \r",
-                    i + 1, entries.size(),
+        std::printf("Progress: %zu/%zu (%2.0f%%)           \r", i + 1, entries.size(),
                     entries.size() > 0 ? (static_cast<double>(i + 1) / entries.size()) * 100.0 : 0.0);
         std::fflush(stdout);
     }
-    std::printf("OK                              \n");
+    Info("OK                              ");
 
     const uint32_t cdStart = static_cast<uint32_t>(out.size());
     for (size_t i = 0; i < entries.size(); ++i) {
@@ -529,7 +535,7 @@ void BSP::patchTexdata(std::string_view oldStem, std::string_view newStem) {
     const std::string find = "maps/" + std::string{oldStem} + "/";
     const std::string repl = "maps/" + std::string{newStem} + "/";
 
-    std::printf("Shifting texture table...\n");
+    Info("Shifting texture table...");
 
     auto loadLump = [&](const lump_t& l) -> std::vector<uint8_t> {
         uint32_t magic = 0;
