@@ -1,107 +1,113 @@
 /* LzFindMt.h -- multithreaded Match finder for LZ algorithms
-2013-01-18 : Igor Pavlov : Public domain */
+: Igor Pavlov : Public domain */
 
-#ifndef __LZ_FIND_MT_H
-#define __LZ_FIND_MT_H
+#ifndef ZIP7_INC_LZ_FIND_MT_H
+#define ZIP7_INC_LZ_FIND_MT_H
 
 #include "LzFind.h"
 #include "Threads.h"
 
 EXTERN_C_BEGIN
 
-#define kMtHashBlockSize (1 << 13)
-#define kMtHashNumBlocks (1 << 3)
-#define kMtHashNumBlocksMask (kMtHashNumBlocks - 1)
+typedef struct
+{
+  UInt32 numProcessedBlocks;
+  Int32 affinityGroup;
+  UInt64 affinityInGroup;
+  UInt64 affinity;
+  CThread thread;
 
-#define kMtBtBlockSize (1 << 14)
-#define kMtBtNumBlocks (1 << 6)
-#define kMtBtNumBlocksMask (kMtBtNumBlocks - 1)
+  BoolInt wasCreated;
+  BoolInt needStart;
+  BoolInt csWasInitialized;
+  BoolInt csWasEntered;
 
-typedef struct _CMtSync {
-    Bool wasCreated;
-    Bool needStart;
-    Bool exit;
-    Bool stopWriting;
+  BoolInt exit;
+  BoolInt stopWriting;
 
-    CThread thread;
-    CAutoResetEvent canStart;
-    CAutoResetEvent wasStarted;
-    CAutoResetEvent wasStopped;
-    CSemaphore freeSemaphore;
-    CSemaphore filledSemaphore;
-    Bool csWasInitialized;
-    Bool csWasEntered;
-    CCriticalSection cs;
-    UInt32 numProcessedBlocks;
+  CAutoResetEvent canStart;
+  CAutoResetEvent wasStopped;
+  CSemaphore freeSemaphore;
+  CSemaphore filledSemaphore;
+  CCriticalSection cs;
+  // UInt32 numBlocks_Sent;
 } CMtSync;
 
-typedef UInt32* (*Mf_Mix_Matches) (void* p, UInt32 matchMinPos, UInt32* distances);
+
+struct CMatchFinderMt_;
+
+typedef UInt32 * (*Mf_Mix_Matches)(struct CMatchFinderMt_ *p, UInt32 matchMinPos, UInt32 *distances);
 
 /* kMtCacheLineDummy must be >= size_of_CPU_cache_line */
 #define kMtCacheLineDummy 128
 
-typedef void (*Mf_GetHeads) (const Byte* buffer,
-UInt32 pos,
-UInt32* hash,
-UInt32 hashMask,
-UInt32* heads,
-UInt32 numHeads,
-const UInt32* crc);
+typedef void (*Mf_GetHeads)(const Byte *buffer, UInt32 pos,
+  UInt32 *hash, UInt32 hashMask, UInt32 *heads, UInt32 numHeads, const UInt32 *crc);
 
-typedef struct _CMatchFinderMt {
-    /* LZ */
-    const Byte* pointerToCurPos;
-    UInt32* btBuf;
-    UInt32 btBufPos;
-    UInt32 btBufPosLimit;
-    UInt32 lzPos;
-    UInt32 btNumAvailBytes;
+typedef struct CMatchFinderMt_
+{
+  /* LZ */
+  const Byte *pointerToCurPos;
+  UInt32 *btBuf;
+  const UInt32 *btBufPos;
+  const UInt32 *btBufPosLimit;
+  UInt32 lzPos;
+  UInt32 btNumAvailBytes;
 
-    UInt32* hash;
-    UInt32 fixedHashSize;
-    UInt32 historySize;
-    const UInt32* crc;
+  UInt32 *hash;
+  UInt32 fixedHashSize;
+  // UInt32 hash4Mask;
+  UInt32 historySize;
+  const UInt32 *crc;
 
-    Mf_Mix_Matches MixMatchesFunc;
+  Mf_Mix_Matches MixMatchesFunc;
+  UInt32 failure_LZ_BT; // failure in BT transfered to LZ
+  // UInt32 failure_LZ_LZ; // failure in LZ tables
+  UInt32 failureBuf[1];
+  // UInt32 crc[256];
 
-    /* LZ + BT */
-    CMtSync btSync;
-    Byte btDummy[kMtCacheLineDummy];
+  /* LZ + BT */
+  CMtSync btSync;
+  Byte btDummy[kMtCacheLineDummy];
 
-    /* BT */
-    UInt32* hashBuf;
-    UInt32 hashBufPos;
-    UInt32 hashBufPosLimit;
-    UInt32 hashNumAvail;
+  /* BT */
+  UInt32 *hashBuf;
+  UInt32 hashBufPos;
+  UInt32 hashBufPosLimit;
+  UInt32 hashNumAvail;
+  UInt32 failure_BT;
 
-    CLzRef* son;
-    UInt32 matchMaxLen;
-    UInt32 numHashBytes;
-    UInt32 pos;
-    Byte* buffer;
-    UInt32 cyclicBufferPos;
-    UInt32 cyclicBufferSize; /* it must be historySize + 1 */
-    UInt32 cutValue;
 
-    /* BT + Hash */
-    CMtSync hashSync;
-    /* Byte hashDummy[kMtCacheLineDummy]; */
+  CLzRef *son;
+  UInt32 matchMaxLen;
+  UInt32 numHashBytes;
+  UInt32 pos;
+  const Byte *buffer;
+  UInt32 cyclicBufferPos;
+  UInt32 cyclicBufferSize; /* it must be = (historySize + 1) */
+  UInt32 cutValue;
 
-    /* Hash */
-    Mf_GetHeads GetHeadsFunc;
-    CMatchFinder* MatchFinder;
+  /* BT + Hash */
+  CMtSync hashSync;
+  /* Byte hashDummy[kMtCacheLineDummy]; */
+  
+  /* Hash */
+  Mf_GetHeads GetHeadsFunc;
+  CMatchFinder *MatchFinder;
+  // CMatchFinder MatchFinder;
 } CMatchFinderMt;
 
-void MatchFinderMt_Construct (CMatchFinderMt* p);
-void MatchFinderMt_Destruct (CMatchFinderMt* p, ISzAlloc* alloc);
-SRes MatchFinderMt_Create (CMatchFinderMt* p,
-UInt32 historySize,
-UInt32 keepAddBufferBefore,
-UInt32 matchMaxLen,
-UInt32 keepAddBufferAfter,
-ISzAlloc* alloc);
-void MatchFinderMt_CreateVTable (CMatchFinderMt* p, IMatchFinder* vTable);
-void MatchFinderMt_ReleaseStream (CMatchFinderMt* p);
+// only for Mt part
+void MatchFinderMt_Construct(CMatchFinderMt *p);
+void MatchFinderMt_Destruct(CMatchFinderMt *p, ISzAllocPtr alloc);
+
+SRes MatchFinderMt_Create(CMatchFinderMt *p, UInt32 historySize, UInt32 keepAddBufferBefore,
+    UInt32 matchMaxLen, UInt32 keepAddBufferAfter, ISzAllocPtr alloc);
+void MatchFinderMt_CreateVTable(CMatchFinderMt *p, IMatchFinder2 *vTable);
+
+/* call MatchFinderMt_InitMt() before IMatchFinder::Init() */
+SRes MatchFinderMt_InitMt(CMatchFinderMt *p);
+void MatchFinderMt_ReleaseStream(CMatchFinderMt *p);
 
 EXTERN_C_END
 

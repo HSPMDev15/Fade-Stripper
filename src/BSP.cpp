@@ -254,10 +254,10 @@ RenameResult BSP::patchPakfile(std::string_view oldStem, std::string_view newSte
         if (eocdPos == 0) break;
         --eocdPos;
     }
-    /*if (!found) {
-        Error("Pakfile EOCD not found");
+    if (!found) {
+        //Error("Pakfile EOCD not found");
         result.ok = false; return result;
-    }*/
+    }
     ZipEOCD eocd; memcpy(&eocd, zip + eocdPos, sizeof(eocd));
 
     result.pakEntries = static_cast<int>(eocd.centralDirEntriesTotal);
@@ -270,7 +270,7 @@ RenameResult BSP::patchPakfile(std::string_view oldStem, std::string_view newSte
     }
     Info("Found {} files in pakfile", result.pakEntries);
     Info("Map is{} compressed", result.pakIsLzma ? "" : " NOT");
-    sleep(1); //let user just for one second to see the program logs before the terminal fills with the renamed references logs
+    //sleep(1); let user just for one second to see the program logs before the terminal fills with the renamed references logs
     struct Rule { std::string from, to, vmtFind, vmtReplace; bool isMaterial; };
     const std::array<Rule, 4> rules{{
         { "materials/maps/" + std::string{oldStem} + "/",

@@ -1,13 +1,12 @@
+#include "LZMA.h"
 
-#include "LZMA.h" //shared
-
-static void* SzAlloc (void*, size_t size) {
-    return malloc (size);
+static void* SzAlloc(ISzAllocPtr, size_t size) {
+    return malloc(size);
 }
-static void SzFree (void*, void* addr) {
-    free (addr);
+static void SzFree(ISzAllocPtr, void* addr) {
+    free(addr);
 }
-static ISzAlloc g_Alloc = { SzAlloc, SzFree };
+static const ISzAlloc g_Alloc = { SzAlloc, SzFree };
 
 struct CInStreamRam {
     ISeqInStream vt;
@@ -16,17 +15,17 @@ struct CInStreamRam {
     size_t pos;
 };
 
-static SRes InStreamRead (void* p, void* buf, size_t* sz) {
-    auto* s      = static_cast<CInStreamRam*> (p);
+static SRes InStreamRead(ISeqInStreamPtr pp, void* buf, size_t* sz) {
+    auto* s      = const_cast<CInStreamRam*>(reinterpret_cast<const CInStreamRam*>(pp));
     size_t avail = s->size - s->pos;
     if (*sz > avail)
         *sz = avail;
-    memcpy (buf, s->data + s->pos, *sz);
+    memcpy(buf, s->data + s->pos, *sz);
     s->pos += *sz;
     return SZ_OK;
 }
 
-static void InStreamInit (CInStreamRam* s, const Byte* data, size_t size) {
+static void InStreamInit(CInStreamRam* s, const Byte* data, size_t size) {
     s->vt.Read = InStreamRead;
     s->data    = data;
     s->size    = size;
@@ -41,17 +40,17 @@ struct COutStreamRam {
     bool overflow;
 };
 
-static size_t OutStreamWrite (void* p, const void* buf, size_t sz) {
-    auto* s        = static_cast<COutStreamRam*> (p);
+static size_t OutStreamWrite(ISeqOutStreamPtr pp, const void* buf, size_t sz) {
+    auto* s        = const_cast<COutStreamRam*>(reinterpret_cast<const COutStreamRam*>(pp));
     size_t written = 0;
     while (written < sz && s->pos < s->capacity)
-        s->data[s->pos++] = static_cast<const Byte*> (buf)[written++];
+        s->data[s->pos++] = static_cast<const Byte*>(buf)[written++];
     if (written != sz)
         s->overflow = true;
     return written;
 }
 
-static void OutStreamInit (COutStreamRam* s, Byte* data, size_t capacity) {
+static void OutStreamInit(COutStreamRam* s, Byte* data, size_t capacity) {
     s->vt.Write = OutStreamWrite;
     s->data     = data;
     s->capacity = capacity;
@@ -100,7 +99,7 @@ unsigned int* pOutputSize) {
     }
     for (int i = 0; i < 8; ++i)
         stdHdr[LZMA_PROPS_SIZE + i] = static_cast<Byte> (inputSize >> (8 * i));
-    outStream.vt.Write (&outStream, stdHdr, LZMA_PROPS_SIZE + 8);
+    ISeqOutStream_Write(&outStream.vt, stdHdr, LZMA_PROPS_SIZE + 8);
 
     CInStreamRam inStream;
     InStreamInit (&inStream, reinterpret_cast<const Byte*> (pInput), inputSize);

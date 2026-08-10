@@ -1,14 +1,14 @@
 /* LzmaLib.h -- LZMA library interface
-2013-01-18 : Igor Pavlov : Public domain */
+2023-04-02 : Igor Pavlov : Public domain */
 
-#ifndef __LZMA_LIB_H
-#define __LZMA_LIB_H
+#ifndef ZIP7_INC_LZMA_LIB_H
+#define ZIP7_INC_LZMA_LIB_H
 
 #include "7zTypes.h"
 
 EXTERN_C_BEGIN
 
-#define MY_STDAPI int MY_STD_CALL
+#define Z7_STDAPI int Z7_STDCALL
 
 #define LZMA_PROPS_SIZE 5
 
@@ -36,19 +36,21 @@ outPropsSize -
   LZMA Encoder will use defult values for any parameter, if it is
   -1  for any from: level, loc, lp, pb, fb, numThreads
    0  for dictSize
-
+  
 level - compression level: 0 <= level <= 9;
 
   level dictSize algo  fb
-    0:    16 KB   0    32
-    1:    64 KB   0    32
-    2:   256 KB   0    32
-    3:     1 MB   0    32
-    4:     4 MB   0    32
+    0:    64 KB   0    32
+    1:   256 KB   0    32
+    2:     1 MB   0    32
+    3:     4 MB   0    32
+    4:    16 MB   0    32
     5:    16 MB   1    32
     6:    32 MB   1    32
-    7+:   64 MB   1    64
-
+    7:    32 MB   1    64
+    8:    64 MB   1    64
+    9:    64 MB   1    64
+ 
   The default value for "level" is 5.
 
   algo = 0 means fast method
@@ -83,6 +85,11 @@ fb - Word size (the number of fast bytes).
 numThreads - The number of thereads. 1 or 2. The default value is 2.
      Fast mode (algo = 0) can use only 1 thread.
 
+In:
+  dest     - output data buffer
+  destLen  - output data buffer size
+  src      - input data
+  srcLen   - input data size
 Out:
   destLen  - processed output size
 Returns:
@@ -93,27 +100,23 @@ Returns:
   SZ_ERROR_THREAD     - errors in multithreading functions (only for Mt version)
 */
 
-MY_STDAPI LzmaCompress (unsigned char* dest,
-size_t* destLen,
-const unsigned char* src,
-size_t srcLen,
-unsigned char* outProps,
-size_t* outPropsSize, /* *outPropsSize must be = 5 */
-int level,            /* 0 <= level <= 9, default = 5 */
-unsigned dictSize,    /* default = (1 << 24) */
-int lc,               /* 0 <= lc <= 8, default = 3  */
-int lp,               /* 0 <= lp <= 4, default = 0  */
-int pb,               /* 0 <= pb <= 4, default = 2  */
-int fb,               /* 5 <= fb <= 273, default = 32 */
-int numThreads        /* 1 or 2, default = 2 */
-);
+Z7_STDAPI LzmaCompress(unsigned char *dest, size_t *destLen, const unsigned char *src, size_t srcLen,
+  unsigned char *outProps, size_t *outPropsSize, /* *outPropsSize must be = 5 */
+  int level,      /* 0 <= level <= 9, default = 5 */
+  unsigned dictSize,  /* default = (1 << 24) */
+  int lc,        /* 0 <= lc <= 8, default = 3  */
+  int lp,        /* 0 <= lp <= 4, default = 0  */
+  int pb,        /* 0 <= pb <= 4, default = 2  */
+  int fb,        /* 5 <= fb <= 273, default = 32 */
+  int numThreads /* 1 or 2, default = 2 */
+  );
 
 /*
 LzmaUncompress
 --------------
 In:
-  dest     - output data
-  destLen  - output data size
+  dest     - output data buffer
+  destLen  - output data buffer size
   src      - input data
   srcLen   - input data size
 Out:
@@ -127,12 +130,8 @@ Returns:
   SZ_ERROR_INPUT_EOF   - it needs more bytes in input buffer (src)
 */
 
-MY_STDAPI LzmaUncompress (unsigned char* dest,
-size_t* destLen,
-const unsigned char* src,
-SizeT* srcLen,
-const unsigned char* props,
-size_t propsSize);
+Z7_STDAPI LzmaUncompress(unsigned char *dest, size_t *destLen, const unsigned char *src, SizeT *srcLen,
+  const unsigned char *props, size_t propsSize);
 
 EXTERN_C_END
 
