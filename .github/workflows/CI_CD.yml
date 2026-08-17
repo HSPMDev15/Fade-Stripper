@@ -19,28 +19,24 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Windows x86
+          - name: Windows (x86_x64)
             os: windows-latest
-            cmake_args: -A Win32
-            artifact: FadeStripper-windows-x86
+            platform: windows
+            artifact: FadeStripper-windows
             ext: zip
 
-          - name: Windows x64
-            os: windows-latest
-            cmake_args: -A x64
-            artifact: FadeStripper-windows-x64
-            ext: zip
-
-          - name: Linux x64
+          - name: Linux
             os: ubuntu-22.04
+            platform: posix
             cmake_args: ""
-            artifact: FadeStripper-linux-x64
+            artifact: FadeStripper-linux
             ext: tar.gz
 
-          - name: macOS ARM64
+          - name: macOS
             os: macos-latest
+            platform: posix
             cmake_args: ""
-            artifact: FadeStripper-macos-arm64
+            artifact: FadeStripper-macos
             ext: tar.gz
 
     steps:
@@ -48,31 +44,51 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Dependencies
+      - name: Install Dependencies
         shell: bash
         run: |
           if   [ "$RUNNER_OS" = "Linux" ]; then sudo apt-get update -qq && sudo apt-get install -y libfmt-dev
           elif [ "$RUNNER_OS" = "macOS" ]; then brew install fmt
           fi
 
-      - name: Configure
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release ${{ matrix.cmake_args }}
-
-      - name: Build
-        run: cmake --build build --config Release --parallel
-
-      - name: Install
-        run: cmake --install build --config Release --prefix dist
-
-      - name: Package
-        shell: bash
+      - name: Configure & Build Debug (Windows)
+        if: matrix.platform == 'windows'
         run: |
-          if [ "$RUNNER_OS" = "Windows" ]; then
-            7z a "${{ matrix.artifact }}.zip" ./dist/FadeStripper.exe
-          else
-            strip dist/FadeStripper
-            tar -czf "${{ matrix.artifact }}.tar.gz" -C dist FadeStripper
-          fi
+          cmake -B build-x86 -A Win32
+          cmake -B build-x64 -A x64
+          cmake --build build-x86 --config Debug --parallel
+          cmake --build build-x64 --config Debug --parallel
+
+      - name: Build & Install Release (Windows)
+        if: matrix.platform == 'windows'
+        run: |
+          cmake --build build-x86 --config Release --parallel
+          cmake --build build-x64 --config Release --parallel
+          cmake --install build-x86 --config Release --prefix dist
+          cmake --install build-x64 --config Release --prefix dist/x64
+
+      - name: Package (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: Compress-Archive -Path dist\* -DestinationPath "${{ matrix.artifact }}.zip"
+
+      - name: Configure & Build Debug (POSIX)
+        if: matrix.platform == 'posix'
+        run: |
+          cmake -B build-dbg -DCMAKE_BUILD_TYPE=Debug ${{ matrix.cmake_args }}
+          cmake --build build-dbg --parallel
+
+      - name: Configure, Build & Install Release (POSIX)
+        if: matrix.platform == 'posix'
+        run: |
+          cmake -B build-rel -DCMAKE_BUILD_TYPE=Release ${{ matrix.cmake_args }}
+          cmake --build build-rel --parallel
+          cmake --install build-rel --config Release --strip --prefix dist
+
+      - name: Package (POSIX)
+        if: matrix.platform == 'posix'
+        shell: bash
+        run: tar -czf "${{ matrix.artifact }}.${{ matrix.ext }}" -C dist FadeStripper
 
       - uses: actions/upload-artifact@v4
         with:

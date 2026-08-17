@@ -75,12 +75,15 @@ if(MSVC)
 else()
     target_compile_options(FadeStripper PRIVATE 
         -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-parameter
-        $<$<CONFIG:Release>:-O3 -march=x86-64-v2>
+        $<$<CONFIG:Release>:-O3> 
         $<$<BOOL:${FS_ENABLE_ASAN}>:-fsanitize=address>
     )
     target_link_options(FadeStripper PRIVATE
         $<$<BOOL:${FS_ENABLE_ASAN}>:-fsanitize=address>
     )
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
+        target_compile_options(FadeStripper PRIVATE $<$<CONFIG:Release>:-march=x86-64-v2>)
+    endif()
 endif()
 
 install(TARGETS FadeStripper RUNTIME DESTINATION .)
