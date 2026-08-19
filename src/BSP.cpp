@@ -166,6 +166,73 @@ bool BSP::bake(std::string_view outputPath) const {
     return ok;
 }
 
+std::vector<uint8_t> BSP::readLump(int lumpIndex) const {
+    const lump_t& l = header_.lumps[lumpIndex];
+    if (l.filelen <= 0) return {};
+
+    uint32_t magic = 0;
+    if (l.filelen >= 4)
+        memcpy(&magic, rawFile_.data() + l.fileofs, sizeof(magic));
+
+    if (magic == LZMA_ID) {
+        unsigned char* dec = nullptr; unsigned int decSz = 0;
+        if (LZMA_Uncompress(rawFile_.data() + l.fileofs, &dec, &decSz) && dec) {
+            std::vector<uint8_t> out(dec, dec + decSz);
+            free(dec);
+            return out;
+        }
+        return {};
+    }
+    return std::vector<uint8_t>(rawFile_.data() + l.fileofs,
+                                rawFile_.data() + l.fileofs + l.filelen);
+}
+
+void BSP::writeLump(int lumpIndex, const uint8_t* data, size_t size) {
+    const lump_t& l = header_.lumps[lumpIndex];
+
+    uint32_t magic = 0;
+    if (l.filelen >= 4)
+        memcpy(&magic, rawFile_.data() + l.fileofs, sizeof(magic));
+    const bool compress = (magic == LZMA_ID);
+
+    std::vector<uint8_t> payload;
+    if (compress) {
+        unsigned int cSz = 0;
+        unsigned char* comp = LZMA_Compress(data, static_cast<unsigned int>(size), &cSz);
+        if (!comp) return;
+        payload.assign(comp, comp + cSz);
+        free(comp);
+    } else {
+        payload.assign(data, data + size);
+    }
+
+    lump_t& lref         = header_.lumps[lumpIndex];
+    const int diff       = static_cast<int>(payload.size()) - lref.filelen;
+    const int alignDiff  = diff > 0 ? ((diff + 3) & ~3) : 0;
+
+    if (alignDiff > 0) {
+        const size_t oldSz     = rawFile_.size();
+        const int    moveStart = lref.fileofs + lref.filelen;
+        rawFile_.resize(oldSz + static_cast<size_t>(alignDiff));
+        uint8_t* base = rawFile_.data();
+        memmove(base + moveStart + alignDiff, base + moveStart,
+                oldSz - static_cast<size_t>(moveStart));
+        for (lump_t& ml : header_.lumps)
+            if (ml.fileofs > lref.fileofs) ml.fileofs += alignDiff;
+        const lump_t& gl = header_.lumps[LUMP_GAME_LUMP];
+        if (gl.filelen > 0) {
+            auto* glHdr     = reinterpret_cast<dgamelumpheader_t*>(rawFile_.data() + gl.fileofs);
+            auto* glEntries = reinterpret_cast<dgamelump_t*>(rawFile_.data() + gl.fileofs + sizeof(dgamelumpheader_t));
+            for (int j = 0; j < glHdr->lumpCount; ++j)
+                if (glEntries[j].fileofs > lref.fileofs)
+                    glEntries[j].fileofs += alignDiff;
+        }
+    }
+
+    memcpy(rawFile_.data() + header_.lumps[lumpIndex].fileofs,
+           payload.data(), payload.size());
+    header_.lumps[lumpIndex].filelen = static_cast<int>(payload.size());
+}
 // Writes patched uncompressed game lumps back to rawFile_.
 // Compressed lumps are handled separately in recompressGameLumps().
 void BSP::burnPatchedGameLumps() {
@@ -501,71 +568,8 @@ void BSP::patchTexdata(std::string_view oldStem, std::string_view newStem) {
 
     Info("Shifting texture table...");
 
-    auto loadLump = [&](const lump_t& l) -> std::vector<uint8_t> {
-        uint32_t magic = 0;
-        if (l.filelen >= 4)
-            memcpy(&magic, rawFile_.data() + l.fileofs, sizeof(magic));
-        if (magic == LZMA_ID) {
-            unsigned char* dec = nullptr; unsigned int decSz = 0;
-            if (LZMA_Uncompress(rawFile_.data() + l.fileofs, &dec, &decSz) && dec) {
-                std::vector<uint8_t> out(dec, dec + decSz);
-                free(dec);
-                return out;
-            }
-            return {};
-        }
-        return std::vector<uint8_t>(rawFile_.data() + l.fileofs, rawFile_.data() + l.fileofs + l.filelen);
-    };
-
-    auto storeLump = [&](int idx, const uint8_t* src, int srcSz, bool compress) {
-        std::vector<uint8_t> payload;
-        if (compress) {
-            unsigned int cSz = 0;
-            unsigned char* comp = LZMA_Compress(src, static_cast<unsigned int>(srcSz), &cSz);
-            if (!comp) return;
-            payload.assign(comp, comp + cSz);
-            free(comp);
-        } else {
-            payload.assign(src, src + srcSz);
-        }
-
-        lump_t& l           = header_.lumps[idx];
-        const int diff      = static_cast<int>(payload.size()) - l.filelen;
-        const int alignDiff = diff > 0 ? ((diff + 3) & ~3) : 0;
-
-        if (alignDiff > 0) {
-            const size_t oldSz     = rawFile_.size();
-            const int    moveStart = l.fileofs + l.filelen;
-            rawFile_.resize(oldSz + static_cast<size_t>(alignDiff));
-            uint8_t* base = rawFile_.data();
-            memmove(base + moveStart + alignDiff, base + moveStart,
-                    oldSz - static_cast<size_t>(moveStart));
-            for (lump_t& ml : header_.lumps)
-                if (ml.fileofs > l.fileofs) ml.fileofs += alignDiff;
-            const lump_t& gl = header_.lumps[LUMP_GAME_LUMP];
-            if (gl.filelen > 0) {
-                auto* glHdr     = reinterpret_cast<dgamelumpheader_t*>(rawFile_.data() + gl.fileofs);
-                auto* glEntries = reinterpret_cast<dgamelump_t*>(rawFile_.data() + gl.fileofs + sizeof(dgamelumpheader_t));
-                for (int j = 0; j < glHdr->lumpCount; ++j)
-                    if (glEntries[j].fileofs > l.fileofs)
-                        glEntries[j].fileofs += alignDiff;
-            }
-        }
-
-        memcpy(rawFile_.data() + header_.lumps[idx].fileofs,
-               payload.data(), payload.size());
-        header_.lumps[idx].filelen = static_cast<int>(payload.size());
-    };
-
-    const bool dataIsLzma  = [&]{ uint32_t m=0;
-        if (lData.filelen  >= 4) memcpy(&m, rawFile_.data() + lData.fileofs,  4);
-        return m == LZMA_ID; }();
-    const bool tableIsLzma = [&]{ uint32_t m=0;
-        if (lTable.filelen >= 4) memcpy(&m, rawFile_.data() + lTable.fileofs, 4);
-        return m == LZMA_ID; }();
-
-    const std::vector<uint8_t> tdBlob = loadLump(lData);
-    const std::vector<uint8_t> ttBlob = loadLump(lTable);
+    const std::vector<uint8_t> tdBlob = readLump(LUMP_TEXDATA_STRING_DATA);
+    const std::vector<uint8_t> ttBlob = readLump(LUMP_TEXDATA_STRING_TABLE);
     if (tdBlob.empty() || ttBlob.empty()) return;
 
     const int numTex = static_cast<int>(ttBlob.size()) / static_cast<int>(sizeof(int32_t));
@@ -601,11 +605,9 @@ void BSP::patchTexdata(std::string_view oldStem, std::string_view newStem) {
         newTd.push_back(0);
     }
 
-    storeLump(LUMP_TEXDATA_STRING_DATA, newTd.data(), static_cast<int>(newTd.size()), dataIsLzma);
-
-    storeLump(LUMP_TEXDATA_STRING_TABLE,
-              reinterpret_cast<const uint8_t*>(newTable.data()), 
-              numTex * static_cast<int>(sizeof(int32_t)), tableIsLzma);
+    writeLump(LUMP_TEXDATA_STRING_DATA, newTd.data(), newTd.size());
+    writeLump(LUMP_TEXDATA_STRING_TABLE, reinterpret_cast<const uint8_t*>(newTable.data()),
+              static_cast<size_t>(numTex) * sizeof(int32_t));
 }
 
 // patches static prop fades in place, renames the pakfile,

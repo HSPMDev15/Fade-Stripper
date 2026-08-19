@@ -30,15 +30,5 @@ inline constexpr size_t SPROP_STRIDE_V7STAR = 72;
 inline constexpr float FADE_NEVER_MIN = -1.0f;
 inline constexpr float FADE_NEVER_MAX = 0.0f;
 
-struct PatchResult {
-    int total     = 0; // props found in the lump
-    int hasFade   = 0;
-    int patched   = 0;
-    int alreadyOk = 0;
-    int errors    = 0;
-    bool ok       = true;
-    std::string error;
-};
-
 // Locate the game lump 'sprp' and patch m_FadeMinDist=-1 and m_FadeMaxDist=0
 PatchResult patchStaticPropFades (BSP& bsp);

@@ -19,6 +19,16 @@ struct GameLump {
     std::vector<uint8_t> data; // always uncompressed data blob (empty if fileofs/filelen invalid or missing in the BSP)
 };
 
+struct PatchResult {
+    int total     = 0;
+    int hasFade   = 0;
+    int patched   = 0;
+    int alreadyOk = 0;
+    int errors    = 0;
+    bool ok       = true;
+    std::string error;
+};
+
 struct RenameResult {
     bool ok         = true;
     int  pakEntries = 0;
@@ -40,6 +50,15 @@ public:
     // writes modified BSP to disk (If outputPath is empty overwrites the original file)
     bool bake(std::string_view outputPath = {}) const;
 
+    // Reads a lump by index into a flat buffer, transparently decompressing
+    // if its compressed with LZMA codec (Valve header)
+    std::vector<uint8_t> readLump(int lumpIndex) const;
+
+    // Writes data back to a lump (recompressing it if the lump was compressed originally)
+    // Grows rawFile_ with memmove + cascades offset updates to every lump/game sublump that follows
+    // only if the new size is larger.
+    void writeLump(int lumpIndex, const uint8_t* data, size_t size);
+    
     RenameResult renameMapReferences(std::string_view oldStem);
 
 private:
