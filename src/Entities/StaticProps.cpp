@@ -1,6 +1,6 @@
 #include "StaticProps.h"
-#include "BSPTypes.h"
-#include "log.h"
+#include "../BSPTypes.h"
+#include "../log.h"
 #include <algorithm>
 #include <cstring>
 

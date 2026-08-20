@@ -1,6 +1,6 @@
 #include "BSP.h"
 #include "log.h"
-#include "StaticProps.h"
+#include "Entities/StaticProps.h"
 #include <chrono>
 #include <filesystem>
 

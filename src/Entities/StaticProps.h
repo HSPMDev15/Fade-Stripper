@@ -1,6 +1,6 @@
 #pragma once
 
-#include "BSP.h"
+#include "../BSP.h"
 
 inline constexpr size_t SPROP_OFF_FLAGS        = 31; // uint8 on layout standard
 inline constexpr size_t SPROP_FADE_MIN_OFF     = 36; // float m_FadeMinDist

@@ -36,7 +36,7 @@ target_compile_options(lzma_sdk PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/W0> $<$<NOT:$
 add_executable(FadeStripper
     src/LZMA.cpp
     src/BSP.cpp
-    src/StaticProps.cpp
+    src/Entities/StaticProps.cpp
     src/main.cpp
 )
 
