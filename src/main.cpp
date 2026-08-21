@@ -4,6 +4,8 @@
 #include <chrono>
 #include <filesystem>
 
+PatchResult patchOverlayFades(BSP& bsp); // foward declaration
+
 namespace fs  = std::filesystem;
 namespace chr = std::chrono;
 
@@ -100,22 +102,29 @@ int main(int argc, char* argv[])  {
 
     Info("{} loaded (BSP v{})",  args_t->input.filename().string(), bsp.version());
 
-    const PatchResult res = patchStaticPropFades(bsp);
- 
-    if (!res.ok)  {
+    const PatchResult sprpRes = patchStaticPropFades(bsp);
+    if (!sprpRes.ok)  {
         return 1;
     }
- 
-    Info("Found {} static props, {} are with fade", res.total, res.hasFade);
+    Info("Found {} static props, {} are with fade", sprpRes.total, sprpRes.hasFade);
 
-    if (res.patched == 0) {
-        Warning("All static props are already without fade\nCancelling...");
+    const PatchResult overlayRes = patchOverlayFades(bsp);
+    if (!overlayRes.ok) {
+        return 1;
+    }
+    Info("Found {} texture overlays, {} are with fade", overlayRes.total, overlayRes.hasFade);
+
+    if (sprpRes.patched == 0 && overlayRes.patched == 0) {
+        Warning("There isn't any entity with fade data on the map\nCancelling...");
         return 0;
     }
  
     const auto t0 = chr::high_resolution_clock::now();
- 
-    Info("Deleting fade on static props...");
+
+    if (sprpRes.patched > 0)
+        Info("Deleting fade on static props...");
+    if (overlayRes.patched > 0)
+        Info("Deleting fade on overlays...");
 
     const std::string  oldStem = args_t->input.stem().string();
     const RenameResult ren     = bsp.renameMapReferences(oldStem);

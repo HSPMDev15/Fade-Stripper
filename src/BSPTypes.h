@@ -14,7 +14,9 @@ enum BSPLumpIndex : int {
     LUMP_PAKFILE              = 40,
     LUMP_TEXDATA_STRING_DATA  = 43,
     LUMP_TEXDATA_STRING_TABLE = 44,
+    LUMP_OVERLAYS             = 45,
     LUMP_MAP_FLAGS            = 59,
+    LUMP_OVERLAY_FADES        = 60,
 };
 
 #pragma pack(push, 1)
@@ -50,5 +52,4 @@ struct dgamelump_t {
 static_assert (sizeof (dgamelump_t) == 16);
 #pragma pack(pop)
 
-inline constexpr int GAMELUMP_STATIC_PROPS =
-(0x73 << 24) | (0x70 << 16) | (0x72 << 8) | 0x70; // 'sprp' = 0x73707270
+inline constexpr int GAMELUMP_STATIC_PROPS = (0x73 << 24) | (0x70 << 16) | (0x72 << 8) | 0x70; // 'sprp' = 0x73707270

@@ -37,6 +37,7 @@ add_executable(FadeStripper
     src/LZMA.cpp
     src/BSP.cpp
     src/Entities/StaticProps.cpp
+    src/Entities/Overlays.cpp
     src/main.cpp
 )
 
