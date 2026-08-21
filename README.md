@@ -1,37 +1,24 @@
 # FadeStripper
 
-This tool automatically sets `FadeMinDist = -1` and `FadeMaxDist = 0` on every `prop_static` in a BSP map (currently v20-v21), preventing fade and having to do it manually in Hammer (this was designed for maps used in SFM since animators don't like fade)
+This tool will automatically delete all the fade distance data on every `prop_static` and `info_overlay` entities in a map (current support for v20/v21 BSP formats), preventing to manually edit their configs in Hammer or any lump editor program (this tool was mainly designed for use on maps used in SFM since artist DONT like the fade)
 
+The LZMA compressed lumps are automatically detected, decompressed, patched, and recompressed by the program 
 
-## Repo structure
+## Dependencies
 
-```
-CMakeLists.txt
-src/
-   lzma/               — the cloned LZMA C lib
-
-  BSPTypes.h           — all format structs (Lump, BSPHeader, ValveLZMAHeader, etc)
-  LZMA.h / .cpp        — Valve format LZMA compress/decompress via liblzma
-  BSP.h  / .cpp        — BSP loader/writer (parseGameLumps, bake)
-  StaticProps.h /.cpp  — sprp patcher (v7* detection)
-  main.cpp             — the EXE entry point
-```
-
-## dependencies
-
-Only the C library from **liblzma** cloned from [here](https://github.com/theaperturecat/csgo-branch-fixed/tree/main/src/utils/lzma/C)
-
+This tool only needs the (already included) C library from **LZMA SDK** downloaded from [this page](https://www.7-zip.org/sdk.html) for its functionality
 
 ## Build
 
-in order to build this tool follow this steps for each (supported) platform
+To build mannually this tool just download the source code zip and uncompress the folder  
 
-just open the terminal on the root path of the repo (FadeStripper folder) and paste the following
+Then open a terminal on `Fade-Stripper-main` directory and paste the following for your platform/compiler
+
+**I will assume you arleady have `Cmake` installed on your machine**
 
 ```bat
 ::windows 
-cmake -B build -G "Visual Studio 17 2022" -A x64 &&
-cmake --build build --config Release
+cmake -B build -G "Visual Studio 17 2022" -A x64 && cmake --build build --config Release
 ```
 
 ```sh
@@ -39,23 +26,27 @@ cmake --build build --config Release
 cmake -B build -DCMAKE_BUILD_TYPE=Release &&
 cmake --build build
 ```
-the file will be located on `build/bin` and then you could place it anywhere on your disk
+The executable file will be located on `build/bin` and then you could place it anywhere on your disk
 
 ## Usage
 
-It's as easy as grabbing and dropping the desired map onto the executable
-OR you can pass the arguments through any terminal (mainly for linux/clang users)
+Go to the [latest release](https://github.com/HSPMDev15/Fade-Stripper/releases/), download your platform zip artifact and uncompress it.
 
-Example:
+Then just drag n drop the map onto the executable OR you can pass the arguments through a terminal window 
+
+CLI use example:
 
 ```
 FadeStripper.exe path/to/my_awesome_map.bsp 
 ```
 
-Output: `mapname_no_fade.bsp` on the same path
+Output: `<mapname>_no_fade.bsp` on same directory as input
 
-The LZMA compressed game lumps are automatically detected, decompressed, patched, and recompressed
+### Custom Output Directory
+You can also optionally specify where to save the patched map using the `-output` argument
 
-## TODO
+For example:
 
-- Add support to remove fade on decals and detailed props
+```FadeStripper.exe my_map.bsp -output ../patched_maps```
+
+**Note:** this supports relative paths (like `../`) and absolute paths
